@@ -30,8 +30,8 @@ This is a sample solution to build a completed MLOps pipeline in production for 
 
 The main use-case of this sample solution is:
 
-- Your team wants to deploy an infrastructure for an ML endpoint of an ML system. Let's call this endpoint `A`.
-- After that, your team wants to deploy another ML endpoint of the same ML system into the existing infrastructure for your own purpose like testing. Let's call this endpoint `B`.
+1. Your team wants to deploy an infrastructure for an ML endpoint of an ML system. Let's call this endpoint `A`.
+1. After that, your team wants to deploy another ML endpoint of the same ML system into the existing infrastructure. Let's call this endpoint `B`.
 
 ## Architecture
 
