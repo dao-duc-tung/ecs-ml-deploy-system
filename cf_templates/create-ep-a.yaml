@@ -1,0 +1,740 @@
+Description: |
+  Infrastructure
+
+Parameters:
+  ProjectName:
+    Description: The name of the project (git repo).
+    Type: String
+
+  EnvironmentName:
+    Description: The name of the target environment.
+    Type: String
+    AllowedValues: [stg, prod]
+
+  VpcCidr:
+    Description: cidr of vpc
+    Type: String
+
+  VpcSubnetIpBlocks:
+    Description: "Comma-delimited list of four CIDR blocks"
+    Type: CommaDelimitedList
+
+  AZs:
+    Description: "Comma-delimited list of two zones"
+    Type: CommaDelimitedList
+
+  AllowedCidrIp:
+    Description: List cidr of allowed IP to LB
+    Type: CommaDelimitedList
+
+  ApiPort:
+    Description: exposed by API container
+    Type: String
+
+  ApiHealthCheckPath:
+    Description: For LB call check the health of service
+    Type: String
+
+  HostHeaderApi:
+    Description: Domain name
+    Type: String
+
+  DNSCertArn:
+    Description: ACM arn of service domain
+    Type: String
+
+  ContainerName:
+    Description: Name of container
+    Type: String
+
+  APITag:
+    Description: tag of image API repo
+    Type: String
+
+  TaskCPU:
+    Description: The number of cpu units used by the task
+    Type: String
+
+  TaskRAM:
+    Description: The amount (in MiB) of memory used by the task.
+    Type: String
+
+  DesiredCount:
+    Description: How many task run on service
+    Type: Number
+
+  MinContainers:
+    Description: for autoscaling
+    Type: Number
+
+  MaxContainers:
+    Description: for autoscaling
+    Type: Number
+
+  AutoScalingTargetValueCPU:
+    Description: target CPU utilization (%)
+    Type: Number
+
+  AutoScalingTargetValueRAM:
+    Description: target RAM utilization (%)
+    Type: Number
+
+Resources:
+  ### NETWORKING CONFIG ###
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join ["", [!Ref EnvironmentName, "-", !Ref ProjectName]]
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    DependsOn: VPC
+    Properties:
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "igw"],
+            ]
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Create subnets
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [0, !Ref VpcSubnetIpBlocks]
+      AvailabilityZone: !Select [0, !Ref AZs]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "public-1"],
+            ]
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [1, !Ref VpcSubnetIpBlocks]
+      AvailabilityZone: !Select [1, !Ref AZs]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "public-2"],
+            ]
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [2, !Ref VpcSubnetIpBlocks]
+      AvailabilityZone: !Select [0, !Ref AZs]
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "private-1"],
+            ]
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [3, !Ref VpcSubnetIpBlocks]
+      AvailabilityZone: !Select [1, !Ref AZs]
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "private-2"],
+            ]
+
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NATGWElasticIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "natgw"],
+            ]
+
+  NATGWElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: VPC
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "natgw"],
+            ]
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "public"],
+            ]
+  PublicRoute1: # Public route table has direct routing to IGW:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value:
+            !Join [
+              "",
+              [!Ref EnvironmentName, "-", !Ref ProjectName, "-", "private"],
+            ]
+  PrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      # Route traffic through the NAT Gateway:
+      NatGatewayId: !Ref NATGateway
+
+  # Attach the public subnets to public route table, private subnets to private route table
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  ### ENDING NETWORKING CONFIG ###
+
+  #### SECURITY GROUP ####
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for LB
+      GroupName: !Sub "${EnvironmentName}-${ProjectName}-elb"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Select [0, !Ref AllowedCidrIp]
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Select [0, !Ref AllowedCidrIp]
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-${ProjectName}-elb"
+
+  APISecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG default for ECS Tasks
+      GroupName: !Sub "${EnvironmentName}-${ProjectName}-ecs-task-api"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ApiPort
+          ToPort: !Ref ApiPort
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-${ProjectName}-ecs-task-api"
+
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for EFS
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref APISecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-${ProjectName}-efs"
+
+  #### ENDING SECURITY GROUP ####
+
+  ###### APPLICATION LOADBALANCER ######
+
+  # Target Groups:
+  TargetGroupApi:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 20
+      # will look for a 200 status code
+      HealthCheckPath: !Ref ApiHealthCheckPath
+      HealthCheckPort: !Ref ApiPort
+      HealthCheckTimeoutSeconds: 5
+      UnhealthyThresholdCount: 5
+      HealthyThresholdCount: 2
+      Name: !Sub "${EnvironmentName}-${ProjectName}-API"
+      Protocol: HTTP
+      Port: !Ref ApiPort
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      TargetType: ip
+      VpcId: !Ref VPC
+
+  # LoadBalancer Configuration #
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: 60
+      Name: !Sub "${EnvironmentName}-${ProjectName}"
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+
+  ListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - FixedResponseConfig:
+            StatusCode: "404"
+            ContentType: "text/plain"
+          Type: fixed-response
+      Certificates:
+        - CertificateArn: !Ref DNSCertArn
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: "HTTPS"
+
+  ListenerHTTP:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Type: "redirect"
+          RedirectConfig:
+            Protocol: "HTTPS"
+            Port: "443"
+            Host: "#{host}"
+            Path: "/#{path}"
+            Query: "#{query}"
+            StatusCode: "HTTP_301"
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: "HTTP"
+
+  ListenerRuleAPI:
+    Type: "AWS::ElasticLoadBalancingV2::ListenerRule"
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupApi
+      Conditions:
+        - Field: host-header
+          HostHeaderConfig:
+            Values:
+              - !Ref HostHeaderApi
+      ListenerArn: !Ref ListenerHTTPS
+      Priority: 1
+
+  ### END APPLICATION LOADBALANCER ###
+
+  ### EFS SHARED VOLUME ###
+
+  # Volume for /assets
+  APIAssetEfs:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_90_DAYS
+      ThroughputMode: bursting
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: AssetsVolume
+
+  APIAssetMountTarget1:
+    Type: AWS::EFS::MountTarget
+    DependsOn: APIAssetEfs
+    Properties:
+      FileSystemId: !Ref APIAssetEfs
+      SubnetId: !Ref PrivateSubnet1
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  APIAssetMountTarget2:
+    Type: AWS::EFS::MountTarget
+    DependsOn: APIAssetEfs
+    Properties:
+      FileSystemId: !Ref APIAssetEfs
+      SubnetId: !Ref PrivateSubnet2
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  # Volume for /weights
+  APIWeightEfs:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_90_DAYS
+      ThroughputMode: bursting
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: WeightsVolume
+
+  APIWeightMountTarget1:
+    Type: AWS::EFS::MountTarget
+    DependsOn: APIWeightEfs
+    Properties:
+      FileSystemId: !Ref APIWeightEfs
+      SubnetId: !Ref PrivateSubnet1
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  APIWeightMountTarget2:
+    Type: AWS::EFS::MountTarget
+    DependsOn: APIWeightEfs
+    Properties:
+      FileSystemId: !Ref APIWeightEfs
+      SubnetId: !Ref PrivateSubnet2
+      SecurityGroups:
+        - !Ref EfsSecurityGroup
+
+  ### ENDING EFS SHARED VOLUME ###
+
+  #### ECS: ROLE, TASK DEFINITION, SERVICE ####
+
+  # CW LogGroup for storing API container's logs
+  APILogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        !Join ["", [/ecs/, !Ref EnvironmentName, "-", !Ref ProjectName, "-API"]]
+      RetentionInDays: 7
+
+  # A role needed for auto scaling
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${EnvironmentName}-${ProjectName}-EcsAutoScalingRole"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole"
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        !Join [
+          "",
+          [!Ref EnvironmentName, "-", !Ref ProjectName, "-ExecutionRole"],
+        ]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
+  # A role for task
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        !Join ["", [!Ref EnvironmentName, "-", !Ref ProjectName, "-TaskRole"]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+
+  # Task Execute Policies
+  ExecutionRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-${ProjectName}-execution"
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetIamge
+              - ecr:GetAuthorizationToken
+              - ecr:GetDownloadUrlForLayer
+            Resource:
+              - !Sub "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*"
+      Roles:
+        - !Ref ExecutionRole
+
+  # ECR registry #
+
+  APIRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${EnvironmentName}-${ProjectName}-api"
+
+  # ECS Cluster
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${EnvironmentName}-${ProjectName}"
+
+  # API Task Definition
+
+  APITaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    # Makes sure the log group is created before it is used.
+    DependsOn:
+      - APILogGroup
+    Properties:
+      # Name of the task definition.
+      Family: !Join ["", [!Ref EnvironmentName, "-", !Ref ProjectName, "-API"]]
+      # awsvpc is required for Fargate
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref TaskCPU
+      Memory: !Ref TaskRAM
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref TaskRole
+      ContainerDefinitions:
+        - Name: !Ref ContainerName
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EnvironmentName}-${ProjectName}-api:${APITag}"
+          PortMappings:
+            - ContainerPort: !Ref ApiPort
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref APILogGroup
+              awslogs-stream-prefix: ecs
+          MountPoints:
+            - SourceVolume: !Sub "${EnvironmentName}-${ProjectName}-assets"
+              ContainerPath: "/app/assets"
+              ReadOnly: false
+            - SourceVolume: !Sub "${EnvironmentName}-${ProjectName}-weights"
+              ContainerPath: "/app/weights"
+              ReadOnly: false
+      Volumes:
+        - Name: !Sub "${EnvironmentName}-${ProjectName}-assets"
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref APIAssetEfs
+            TransitEncryption: ENABLED
+        - Name: !Sub "${EnvironmentName}-${ProjectName}-weights"
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref APIWeightEfs
+            TransitEncryption: ENABLED
+
+  # API ECS SERVICE #
+  APIService:
+    DependsOn:
+      - LoadBalancer
+      - ListenerHTTP
+      - ListenerHTTPS
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName:
+        !Join ["", [!Ref EnvironmentName, "-", !Ref ProjectName, "-API"]]
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref APITaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: !Ref DesiredCount
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          # change to DISABLED if you're using private subnets that have access to a NAT gateway
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnet1
+            - !Ref PrivateSubnet2
+          SecurityGroups:
+            - !Ref APISecurityGroup
+      LoadBalancers:
+        - TargetGroupArn: !Ref TargetGroupApi
+          ContainerPort: !Ref ApiPort
+          ContainerName: !Ref ContainerName
+      PlatformVersion: 1.4.0
+
+  # ECS API SERVICE AUTO SCALING TARGET #
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref MinContainers
+      MaxCapacity: !Ref MaxContainers
+      ResourceId:
+        !Join ["/", [service, !Ref EcsCluster, !GetAtt APIService.Name]]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      # ARN of an AWS IAM role that allows Application Auto Scaling to modify your scalable target.
+      RoleARN: !GetAtt AutoScalingRole.Arn
+
+  # ECS API SERVICE AUTO SCALING POLICY #
+  # NEED TO MORNITOR YOUR SERVICE TO EVALUATE A BEST 'AutoScalingTargetValue' #
+  AutoScalingPolicyCPU:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-${ProjectName}-AutoScalingPolicyCPU-for-API"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 120
+        ScaleOutCooldown: 60
+        TargetValue: !Ref AutoScalingTargetValueCPU
+
+  AutoScalingPolicyRAM:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-${ProjectName}-AutoScalingPolicyRAM-for-API"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: !Ref AutoScalingTargetValueRAM
+        ScaleInCooldown: 120
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+###  ECS ###
+
+###  OUTPUT ###
+Outputs:
+  VpcID:
+    Description: the ID of the VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-vpcID"
+
+  SGIdofLB:
+    Description: the ID of the internal LoadBalancer Security Group
+    Value: !Ref LoadBalancerSecurityGroup
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-sg-lb-id"
+
+  ListenerHTTPSLBArn:
+    Description: Arn of ListenerHTTPS
+    Value: !Ref ListenerHTTPS
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-ListenerHTTPSArn"
+
+  EcsClusterName:
+    Description: Ecs cluster name
+    Value: !Ref EcsCluster
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-ECSCluster"
+
+  PublicSubnet1ID:
+    Description: the ID of the subnet
+    Value: !Ref PublicSubnet1
+
+  PublicSubnet2ID:
+    Description: the ID of the subnet
+    Value: !Ref PublicSubnet2
+
+  PrivateSubnet1ID:
+    Description: the ID of the subnet
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-ID-pri1"
+
+  PrivateSubnet2ID:
+    Description: the ID of the subnet
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-ID-pri2"
+
+  SGIdofEfs:
+    Description: the ID of the ECSTask Security Group Default
+    Value: !Ref EfsSecurityGroup
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-sg-efs"
+
+  ECSExecutionRole:
+    Description: ECS Execution role
+    Value: !Ref ExecutionRole
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-ExecutionRole"
+
+  ECSTaskRole:
+    Description: ECS Task role
+    Value: !Ref TaskRole
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-TaskRole"
+
+  AutoScalingRoleArn:
+    Description: Arn of AutoScalingRole
+    Value: !GetAtt AutoScalingRole.Arn
+    Export:
+      Name: !Sub "${EnvironmentName}-${ProjectName}-AutoScalingRoleArn"

@@ -1,0 +1,78 @@
+[
+    {
+        "ParameterKey": "ProjectName",
+        "ParameterValue": "test"
+    },
+    {
+        "ParameterKey": "EnvironmentName",
+        "ParameterValue": "prod"
+    },
+    {
+        "ParameterKey": "VpcCidr",
+        "ParameterValue": "10.0.0.0/16"
+    },
+    {
+        "ParameterKey": "VpcSubnetIpBlocks",
+        "ParameterValue": "10.0.0.0/24,10.0.1.0/24,10.0.2.0/24,10.0.3.0/24"
+    },
+    {
+        "ParameterKey": "AZs",
+        "ParameterValue": "Example: 'ap-southeast-1a,ap-southeast-1b'"
+    },
+    {
+        "ParameterKey": "AllowedCidrIp",
+        "ParameterValue": "0.0.0.0/0"
+    },
+    {
+        "ParameterKey": "ApiPort",
+        "ParameterValue": "8000"
+    },
+    {
+        "ParameterKey": "ApiHealthCheckPath",
+        "ParameterValue": "/ping"
+    },
+    {
+        "ParameterKey": "HostHeaderApi",
+        "ParameterValue": "test.org"
+    },
+    {
+        "ParameterKey": "DNSCertArn",
+        "ParameterValue": "Get from ACM"
+    },
+    {
+        "ParameterKey": "ContainerName",
+        "ParameterValue": "api"
+    },
+    {
+        "ParameterKey": "APITag",
+        "ParameterValue": "docker image tag"
+    },
+    {
+        "ParameterKey": "TaskCPU",
+        "ParameterValue": "1024"
+    },
+    {
+        "ParameterKey": "TaskRAM",
+        "ParameterValue": "2GB"
+    },
+    {
+        "ParameterKey": "DesiredCount",
+        "ParameterValue": "2"
+    },
+    {
+        "ParameterKey": "MinContainers",
+        "ParameterValue": "2"
+    },
+    {
+        "ParameterKey": "MaxContainers",
+        "ParameterValue": "10"
+    },
+    {
+        "ParameterKey": "AutoScalingTargetValueCPU",
+        "ParameterValue": "60"
+    },
+    {
+        "ParameterKey": "AutoScalingTargetValueRAM",
+        "ParameterValue": "90"
+    }
+]

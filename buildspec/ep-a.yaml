@@ -1,0 +1,32 @@
+version: 0.2
+
+phases:
+  pre_build:
+    on-failure: ABORT
+    commands:
+      - echo "checking version dependencies ..."
+  build:
+    on-failure: ABORT
+    commands:
+      - echo Build started on `date`
+      - export STACK_NAME="<stack-name>"
+      - export REGISTRY_URL="<ecr-repo-url>/${STACK_NAME}"
+      - export TAG_MARKER="tag-"
+      - export IMAGE_TAG="${TAG_MARKER}${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+
+      - aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <ecr-url>
+      - docker build -f Dockerfile -t ${STACK_NAME} .
+      - echo Updating Tag ... then push docker image to ecr
+      - docker tag ${STACK_NAME}:latest ${REGISTRY_URL}:${IMAGE_TAG}
+      - docker push ${REGISTRY_URL}:${IMAGE_TAG}
+      - echo Build completed on `date`
+
+  post_build:
+    on-failure: ABORT
+    commands:
+      - echo Updating Cloudformation Stack ...
+      - cd cf_templates && ls -ltr
+      - export TEMPLATE_FILE="<template-file>"
+      - export PARAM_FILE="<param-file>"
+      - sed -i -e "s+${TAG_MARKER}[a-z,0-9]*+${IMAGE_TAG}+g" ${PARAM_FILE}
+      - aws cloudformation update-stack --stack-name=${STACK_NAME} --template-body file://${TEMPLATE_FILE} --parameters file://${PARAM_FILE} --capabilities CAPABILITY_NAMED_IAM
