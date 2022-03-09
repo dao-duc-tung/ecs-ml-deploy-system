@@ -51,7 +51,7 @@ The CloudFormation stack creates the ECR repository. The CodePipeline and CodeBu
 1. Set parameter "DesiredCount" in "cf_templates/create-ep-a.json" to 0 to avoid the error "docker image is not ready" when the CloudFormation stack is created, because at the time the stack is created, the ECR repository doesn't exist. Set other parameters as well.
 1. Run
    ```bash
-   aws cloudformation create-stack --stack-name=<stack-name> --template-body file://cf_templates/create-ep-a.yaml --parameters file://cf_templates/create-ep-a.json --capabilities CAPABILITY_NAMED_IAM
+   aws cloudformation create-stack --stack-name=create-ep-a --template-body file://cf_templates/create-ep-a.yaml --parameters file://cf_templates/create-ep-a.json --capabilities CAPABILITY_NAMED_IAM
    ```
 
 ### 1.2. Create CodePipeline and CodeBuild projects
@@ -60,7 +60,7 @@ This step creates manually CodePipeline and CodeBuild projects. In the next vers
 
 1. Update "buildspec/ep-a.yaml" file and push the code
 1. Go to AWS Console > CodePipeline > Create new pipeline
-1. Choose pipeline settings
+1. Configure pipeline settings
 
    - Pipeline name: "ep-a"
    - Select "New service role"
@@ -111,7 +111,7 @@ This step can be automated by creating a AWS Lambda function to run the validati
 
 1. Set parameter "DesiredCount" in "cf_templates/create-ep-a.json" to the expected value.
 1. Set parameter "APITag" to the latest git commit hash in "master" branch.
-1. Update stack
+1. Update stack. This might take ~10m.
 
    ```bash
    aws cloudformation update-stack --stack-name=<stack-name> --template-body file://cf_templates/create-ep-a.yaml --parameters file://cf_templates/create-ep-a.json --capabilities CAPABILITY_NAMED_IAM
@@ -144,6 +144,37 @@ This step can be automated by creating a AWS Lambda function to run the validati
 1. Mount the shared assets EFS folder to the EC2 bastion instance to validate if the data is stored correctly
 
 ## Deployment Step 2: Add Endpoint B
+
+Adding endpoint B into the existing infrastructure has similar steps as creating the infrastructure for the endpoint A.
+
+### 2.1. Create CloudFormation stack
+
+1. Set parameter "DesiredCount" in "cf_templates/add-ep-b.json" to 0.
+1. Set parameter ListernerRulePriority to the `latest priority + 1` given that the latest priority in the ALB is currently in use
+1. Run
+   ```bash
+   aws cloudformation create-stack --stack-name=add-ep-b --template-body file://cf_templates/add-ep-b.yaml --parameters file://cf_templates/add-ep-b.json --capabilities CAPABILITY_NAMED_IAM
+   ```
+
+### 2.2. Create CodePipeline and CodeBuild projects
+
+This step is similar as the section `1.2. Create CodePipeline and CodeBuild projects`. For the buildspec file, just clone "buildspec/ep-a.yaml" file for the endpoint B.
+
+### 2.3. Validate resources
+
+This step is similar as the section `1.3. Validate resources`.
+
+### 2.4. Update CloudFormation stack
+
+This step is similar as the section `1.4. Update CloudFormation stack`.
+
+### 2.5. Upload model's weights
+
+This step is similar as the section `1.5. Upload model's weights`.
+
+### 2.6. Test endpoint
+
+This step is similar as the section `1.6. Test endpoint`.
 
 ## Miscellaneous
 

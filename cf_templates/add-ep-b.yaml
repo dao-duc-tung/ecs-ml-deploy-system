@@ -1,0 +1,371 @@
+Description: |
+  Infrastructure for Endpoint B
+
+Parameters:
+  ProjectName:
+    Description: The name of the project (git repo).
+    Type: String
+
+  EnvironmentName:
+    Description: The name of the target environment.
+    Type: String
+    AllowedValues: [stg, prod]
+
+  ApiPort:
+    Description: exposed by API container
+    Type: String
+
+  ApiHealthCheckPath:
+    Description: For LB call check the health of service
+    Type: String
+
+  HostHeaderApi:
+    Description: Domain name
+    Type: String
+
+  ContainerName:
+    Description: Name of container
+    Type: String
+
+  APITag:
+    Description: tag of image API repo
+    Type: String
+
+  TaskCPU:
+    Description: The number of cpu units used by the task
+    Type: String
+
+  TaskRAM:
+    Description: The amount (in MiB) of memory used by the task.
+    Type: String
+
+  DesiredCount:
+    Description: How many task run on service
+    Type: Number
+
+  MinContainers:
+    Description: for autoscaling
+    Type: Number
+
+  MaxContainers:
+    Description: for autoscaling
+    Type: Number
+
+  AutoScalingTargetValueCPU:
+    Description: target CPU utilization (%)
+    Type: Number
+
+  AutoScalingTargetValueRAM:
+    Description: target RAM utilization (%)
+    Type: Number
+
+  ListenerRulePriority:
+    Description: priority of rule (integer)
+    Type: Number
+
+  MountPathAssets:
+    Description: The path of assets folder in container
+    Type: String
+
+  MountPathWeights:
+    Description: The path of weights  folder in container
+    Type: String
+
+Resources:
+  #### SECURITY GROUP ####
+  APISecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for ECS Tasks
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-vpcID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ApiPort
+          ToPort: !Ref ApiPort
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-sg-lb-id"
+
+  #### ENDING SECURITY GROUP ####
+
+  ###### APPLICATION LOADBALANCER ######
+
+  # Target Groups:
+  TargetGroupApi:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 20
+      # will look for a 200 status code
+      HealthCheckPath: !Ref ApiHealthCheckPath
+      HealthCheckPort: !Ref ApiPort
+      HealthCheckTimeoutSeconds: 5
+      UnhealthyThresholdCount: 5
+      HealthyThresholdCount: 2
+      Name: !Sub "${EnvironmentName}-${ProjectName}-${ContainerName}"
+      Protocol: HTTP
+      Port: !Ref ApiPort
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+      TargetType: ip
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-vpcID"
+
+  # LoadBalancer Configuration #
+
+  ListenerRuleAPI:
+    Type: "AWS::ElasticLoadBalancingV2::ListenerRule"
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroupApi
+      Conditions:
+        - Field: host-header
+          HostHeaderConfig:
+            Values:
+              - !Ref HostHeaderApi
+      ListenerArn:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ListenerHTTPSArn"
+      Priority: !Ref ListenerRulePriority
+
+  ### END APPLICATION LOADBALANCER ###
+
+  ### EFS SHARED VOLUME ###
+
+  # Volume for /assets
+  APIAssetEfs:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_90_DAYS
+      ThroughputMode: bursting
+      Encrypted: true
+
+  APIAssetMountTarget1:
+    Type: AWS::EFS::MountTarget
+    DependsOn: APIAssetEfs
+    Properties:
+      FileSystemId: !Ref APIAssetEfs
+      SubnetId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ID-pri1"
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-sg-efs"
+
+  APIAssetMountTarget2:
+    Type: AWS::EFS::MountTarget
+    DependsOn: APIAssetEfs
+    Properties:
+      FileSystemId: !Ref APIAssetEfs
+      SubnetId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ID-pri2"
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-sg-efs"
+
+  # Volume for /weights
+  APIWeightEfs:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_90_DAYS
+      ThroughputMode: bursting
+      Encrypted: true
+
+  APIWeightMountTarget1:
+    Type: AWS::EFS::MountTarget
+    DependsOn: APIWeightEfs
+    Properties:
+      FileSystemId: !Ref APIWeightEfs
+      SubnetId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ID-pri1"
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-sg-efs"
+
+  APIWeightMountTarget2:
+    Type: AWS::EFS::MountTarget
+    DependsOn: APIWeightEfs
+    Properties:
+      FileSystemId: !Ref APIWeightEfs
+      SubnetId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ID-pri2"
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-sg-efs"
+
+  ### ENDING EFS SHARED VOLUME ###
+
+  ####  ECS: ROLE, TASK DEFINITION, SERVICE ####
+
+  # CW LogGroup for storing API container's logs
+  APILogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        !Join [
+          "",
+          [
+            /ecs/,
+            !Ref EnvironmentName,
+            "-",
+            !Ref ProjectName,
+            "-",
+            !Ref ContainerName,
+          ],
+        ]
+      RetentionInDays: 7
+
+  # ECR registry #
+
+  APIRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${EnvironmentName}-${ProjectName}-${ContainerName}"
+
+  # API Task Definition
+
+  APITaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    # Makes sure the log group is created before it is used.
+    DependsOn:
+      - APILogGroup
+    Properties:
+      # Name of the task definition.
+      Family:
+        !Join [
+          "",
+          [
+            !Ref EnvironmentName,
+            "-",
+            !Ref ProjectName,
+            "-",
+            !Ref ContainerName,
+          ],
+        ]
+      # awsvpc is required for Fargate
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref TaskCPU
+      Memory: !Ref TaskRAM
+      ExecutionRoleArn:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ExecutionRole"
+      TaskRoleArn:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-TaskRole"
+      ContainerDefinitions:
+        - Name: !Ref ContainerName
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EnvironmentName}-${ProjectName}-${ContainerName}:${APITag}"
+          PortMappings:
+            - ContainerPort: !Ref ApiPort
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref APILogGroup
+              awslogs-stream-prefix: ecs
+          MountPoints:
+            - SourceVolume: !Sub "${EnvironmentName}-${ProjectName}-assets"
+              ContainerPath: !Ref MountPathAssets
+              ReadOnly: false
+            - SourceVolume: !Sub "${EnvironmentName}-${ProjectName}-weights"
+              ContainerPath: !Ref MountPathWeights
+              ReadOnly: false
+      Volumes:
+        - Name: !Sub "${EnvironmentName}-${ProjectName}-assets"
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref APIAssetEfs
+            TransitEncryption: ENABLED
+        - Name: !Sub "${EnvironmentName}-${ProjectName}-weights"
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref APIWeightEfs
+            TransitEncryption: ENABLED
+
+  # API ECS SERVICE #
+  APIService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName:
+        !Join [
+          "",
+          [
+            !Ref EnvironmentName,
+            "-",
+            !Ref ProjectName,
+            "-",
+            !Ref ContainerName,
+          ],
+        ]
+      Cluster:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ECSCluster"
+      TaskDefinition: !Ref APITaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: !Ref DesiredCount
+      EnableExecuteCommand: true
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          # change to DISABLED if you're using private subnets that have access to a NAT gateway
+          AssignPublicIp: DISABLED
+          Subnets:
+            - Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ID-pri1"
+            - Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-ID-pri2"
+          SecurityGroups:
+            - !Ref APISecurityGroup
+      LoadBalancers:
+        - TargetGroupArn: !Ref TargetGroupApi
+          ContainerPort: !Ref ApiPort
+          ContainerName: !Ref ContainerName
+      PlatformVersion: 1.4.0
+
+  # ECS API SERVICE AUTO SCALING TARGET #
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref MinContainers
+      MaxCapacity: !Ref MaxContainers
+      ResourceId:
+        !Join [
+          "/",
+          [
+            service,
+            !Sub "${EnvironmentName}-${ProjectName}",
+            !GetAtt APIService.Name,
+          ],
+        ]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      # ARN of an AWS IAM role that allows Application Auto Scaling to modify your scalable target.
+      RoleARN:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${ProjectName}-AutoScalingRoleArn"
+
+  # ECS API SERVICE AUTO SCALING POLICY #
+  # NEED TO MORNITOR YOUR SERVICE TO EVALUATE A BEST 'AutoScalingTargetValue' #
+  AutoScalingPolicyCPU:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-${ProjectName}-AutoScalingPolicyCPU-for-${ContainerName}"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 120
+        ScaleOutCooldown: 60
+        TargetValue: !Ref AutoScalingTargetValueCPU
+
+  AutoScalingPolicyRAM:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-${ProjectName}-AutoScalingPolicyRAM-for-${ContainerName}"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: !Ref AutoScalingTargetValueRAM
+        ScaleInCooldown: 120
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+### ENDING ECS ###

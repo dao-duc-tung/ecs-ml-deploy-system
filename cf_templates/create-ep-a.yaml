@@ -1,5 +1,5 @@
 Description: |
-  Infrastructure
+  Infrastructure for Endpoint A
 
 Parameters:
   ProjectName:

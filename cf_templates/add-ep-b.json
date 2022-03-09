@@ -1,0 +1,70 @@
+[
+    {
+        "ParameterKey": "ProjectName",
+        "ParameterValue": "ep-b"
+    },
+    {
+        "ParameterKey": "EnvironmentName",
+        "ParameterValue": "prod"
+    },
+    {
+        "ParameterKey": "ContainerName",
+        "ParameterValue": "ep-b"
+    },
+    {
+        "ParameterKey": "ApiPort",
+        "ParameterValue": "8000"
+    },
+    {
+        "ParameterKey": "ApiHealthCheckPath",
+        "ParameterValue": "/"
+    },
+    {
+        "ParameterKey": "HostHeaderApi",
+        "ParameterValue": "ep-b.test.org"
+    },
+    {
+        "ParameterKey": "APITag",
+        "ParameterValue": "tag-<git commit hash>"
+    },
+    {
+        "ParameterKey": "DesiredCount",
+        "ParameterValue": "2"
+    },
+    {
+        "ParameterKey": "MinContainers",
+        "ParameterValue": "2"
+    },
+    {
+        "ParameterKey": "MaxContainers",
+        "ParameterValue": "4"
+    },
+    {
+        "ParameterKey": "TaskCPU",
+        "ParameterValue": "1024"
+    },
+    {
+        "ParameterKey": "TaskRAM",
+        "ParameterValue": "2GB"
+    },
+    {
+        "ParameterKey": "AutoScalingTargetValueCPU",
+        "ParameterValue": "60"
+    },
+    {
+        "ParameterKey": "AutoScalingTargetValueRAM",
+        "ParameterValue": "90"
+    },
+    {
+        "ParameterKey": "ListenerRulePriority",
+        "ParameterValue": "2"
+    },
+    {
+        "ParameterKey": "MountPathAssets",
+        "ParameterValue": "/app/assets"
+    },
+    {
+        "ParameterKey": "MountPathWeights",
+        "ParameterValue": "/app/weights"
+    }
+]

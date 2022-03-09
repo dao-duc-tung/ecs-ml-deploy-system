@@ -1,7 +1,7 @@
 [
     {
         "ParameterKey": "ProjectName",
-        "ParameterValue": "test"
+        "ParameterValue": "ep-a"
     },
     {
         "ParameterKey": "EnvironmentName",
@@ -17,7 +17,7 @@
     },
     {
         "ParameterKey": "AZs",
-        "ParameterValue": "Example: 'ap-southeast-1a,ap-southeast-1b'"
+        "ParameterValue": "ap-southeast-1a,ap-southeast-1b"
     },
     {
         "ParameterKey": "AllowedCidrIp",
@@ -33,7 +33,7 @@
     },
     {
         "ParameterKey": "HostHeaderApi",
-        "ParameterValue": "test.org"
+        "ParameterValue": "ep-a.test.org"
     },
     {
         "ParameterKey": "DNSCertArn",
@@ -41,7 +41,7 @@
     },
     {
         "ParameterKey": "ContainerName",
-        "ParameterValue": "api"
+        "ParameterValue": "ep-a"
     },
     {
         "ParameterKey": "APITag",
@@ -65,7 +65,7 @@
     },
     {
         "ParameterKey": "MaxContainers",
-        "ParameterValue": "10"
+        "ParameterValue": "4"
     },
     {
         "ParameterKey": "AutoScalingTargetValueCPU",
