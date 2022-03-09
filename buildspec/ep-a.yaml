@@ -15,7 +15,7 @@ phases:
       - export IMAGE_TAG="${TAG_MARKER}${CODEBUILD_RESOLVED_SOURCE_VERSION}"
 
       - aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <ecr-url>
-      - docker build -f Dockerfile -t ${STACK_NAME} .
+      - docker build -f Dockerfile -t ${STACK_NAME} src
       - echo Updating Tag ... then push docker image to ecr
       - docker tag ${STACK_NAME}:latest ${REGISTRY_URL}:${IMAGE_TAG}
       - docker push ${REGISTRY_URL}:${IMAGE_TAG}
