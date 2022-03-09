@@ -18,9 +18,10 @@
     <li><a href="#architecture">Architecture</a></li>
     <li><a href="#create-endpoint-a">Create Endpoint A</a></li>
     <li><a href="#add-endpoint-b">Add Endpoint B</a></li>
+    <li><a href="#miscellaneous">Miscellaneous</a></li>
+    <li><a href="#cleanup">Cleanup</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="#cleanup">Cleanup</a></li>
   </ol>
 </details>
 
