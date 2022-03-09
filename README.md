@@ -1,5 +1,29 @@
 # ECS MLOps
 
+<!-- PROJECT LOGO -->
+<br />
+<p align="center">
+  <a href="https://github.com/dao-duc-tung/ecs-mlops">
+    <img src="assets/images/banner.png" alt="Logo" width="300" height="100">
+  </a>
+
+  <h3 align="center">ECS MLOps</h3>
+</p>
+
+<!-- TABLE OF CONTENTS -->
+<details open="open">
+  <summary>Table of Contents</summary>
+  <ol>
+    <li><a href="#introduction">Introduction</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#create-endpoint-a">Create Endpoint A</a></li>
+    <li><a href="#add-endpoint-b">Add Endpoint B</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgements">Acknowledgements</a></li>
+  </ol>
+</details>
+
 ## Introduction
 
 This is a sample solution to build a completed MLOps pipeline in production for a typical ML system. This example could be useful for any engineer or organization looking to operationalize ML with native AWS development tools such as CodePipeline, CodeBuild, and ECS.
@@ -33,7 +57,7 @@ In the following diagram, you can view the continuous delivery stages of the sys
 - CloudWatch: collects monitoring and operational data in the form of logs, metrics, and events.
 - Simple Notification Service (SNS): manages messaging service for both application-to-application (A2A) and application-to-person (A2P) communication. In this project, we don't configure SNS.
 
-## Deployment Step 1: Create Endpoint A
+## Create Endpoint A
 
 Creating the infrastructure for the endpoint A has several steps:
 
@@ -143,7 +167,7 @@ This step can be automated by creating a AWS Lambda function to run the validati
 1. Test the API by sending a request to the expected URL
 1. Mount the shared assets EFS folder to the EC2 bastion instance to validate if the data is stored correctly
 
-## Deployment Step 2: Add Endpoint B
+## Add Endpoint B
 
 Adding endpoint B into the existing infrastructure has similar steps as creating the infrastructure for the endpoint A.
 
@@ -177,6 +201,67 @@ This step is similar as the section `1.5. Upload model's weights`.
 This step is similar as the section `1.6. Test endpoint`.
 
 ## Miscellaneous
+
+### Update CloudFormation template for future changes
+
+In the future, when you want to update and validate the CloudFormation template without triggering the CodePipeline either manually or automatically, follow these steps:
+
+1. Set `APITag` parameter in the parameter json file to the latest git commit hash in master branch
+1. Run `aws cloudformation update-stack` command
+1. After confirming the template is usable, discard the changes of the APITag parameter in the parameter json file and commit the rest of changes.
+
+### Access container in Fargate/EC2 instance using ECS Exec
+
+Sometimes you might want to access the containers in Fargate/EC2 instances for debugging purposes. Follow these below instructions to do it. Read [this article](https://aws.amazon.com/blogs/containers/new-using-amazon-ecs-exec-access-your-containers-fargate-ec2/) for more information.
+
+1. Install SSM: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+1. Make sure the ECS Task Role allows these actions:
+   ```bash
+   “ssmmessages:CreateControlChannel”
+   “ssmmessages:CreateDataChannel”
+   “ssmmessages:OpenControlChannel”
+   “ssmmessages:OpenDataChannel”
+   ```
+1. Make sure `EnableExecuteCommand` is true in `AWS::ECS::Service` resource in the CloudFormation template.
+   - If you haven't set, then set it to true, and update the cloudformation stack
+   - Manually stop all the tasks run by your ECS Service
+   - Wait until the new tasks are deployed
+1. Run this command to `exec` into the container.
+   ```bash
+   aws ecs execute-command --cluster <ecs-cluster> --task <TASK ID> --command "/bin/bash" --interactive
+   ```
+
+### Mount the EFS shared volume on the EC2 bastion instance
+
+The purpose of mounting the EFS shared volume is to manipulate the saved data. Follow these below instructions. Read [this article](https://docs.aws.amazon.com/efs/latest/ug/wt1-test.html) for more detail.
+
+1. Ask your Admin to get the .pem file to be able to SSH to the EC2 bastion instance
+1. Add your IP into the Inbound Rules of the Security Group of the EC2 bastion instance
+1. SSH to the EC2 bastion instance
+1. Make sure the NFS client is installed on the EC2 instance
+1. Create a directory to mount the EFS shared volume to
+   ```bash
+   sudo mkdir /mnt/new-folder
+   ```
+1. Go to AWS Console > EFS to get the correct EFS file system ID of the EFS shared volume
+1. Run
+   ```bash
+   sudo mount -t nfs -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport <efs-file-system-id>.efs.<region>.amazonaws.com:/ /mnt/new-folder
+   ```
+1. Validate the mount point
+   ```bash
+   df -aTh
+   ```
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
+
+## Contact
+
+Tung Dao - [LinkedIn](https://www.linkedin.com/in/tungdao17/)
+
+Project Link: [https://github.com/dao-duc-tung/ecs-mlops](https://github.com/dao-duc-tung/ecs-mlops)
 
 <!-- MARKDOWN LINKS & IMAGES -->
 
