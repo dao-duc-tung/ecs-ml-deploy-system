@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 class Item(BaseModel):
     name: str
-    price: float
+    x: float
 
 
 app = FastAPI()

@@ -20,7 +20,7 @@
     <li><a href="#add-endpoint-b">Add Endpoint B</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgements">Acknowledgements</a></li>
+    <li><a href="#cleanup">Cleanup</a></li>
   </ol>
 </details>
 
@@ -30,7 +30,7 @@ This is a sample solution to build a completed MLOps pipeline in production for 
 
 The main use-case of this sample solution is:
 
-1. Your team wants to deploy an infrastructure for an ML endpoint of an ML system. Let's call this endpoint `A`.
+1. Your team wants to deploy infrastructure for an ML endpoint of an ML system. Let's call this endpoint `A`.
 1. After that, your team wants to deploy another ML endpoint of the same ML system into the existing infrastructure. Let's call this endpoint `B`.
 
 ## Architecture
@@ -44,22 +44,22 @@ In the following diagram, you can view the continuous delivery stages of the sys
 
 ### Component Details
 
-- CodePipeline: has various stages that define which step through which actions must be taken in which order to go from source code to creation of the production resources.
-- CodeBuild: builds the source code from GitHub and runs CloudFormation templates.
-- CloudFormation (CF): creates resources using YAML template.
-- Elastic Container Registry (ECR): stores docker images.
-- Elastic Container Service (ECS): groups container instances on which we can run task requests.
-- Elastic File System (EFS): stores user request's data and model's weights.
-- Application Load Balancer (ALB): distributes incoming application traffic across multiple target groups in ECS across Availability Zones. It monitors the health of its registered targets, and routes traffic only to the healthy targets.
-- Route 53: connects user requests to infrastructure running in AWS, in our case, the ALB. In this project, we will use another domain provider to route the traffic at domain level.
-- AWS Certificate Manager (ACM): provisions, manages, and deploys public and private Secure Sockets Layer/Transport Layer Security (SSL/TLS) certificates for use with AWS services.
-- Virtual Private Cloud (VPC): controls our virtual networking environment, including resource placement, connectivity, and security.
-- CloudWatch: collects monitoring and operational data in the form of logs, metrics, and events.
-- Simple Notification Service (SNS): manages messaging service for both application-to-application (A2A) and application-to-person (A2P) communication. In this project, we don't configure SNS.
+- **CodePipeline**: has various stages that define which step through which actions must be taken in which order to go from source code to creation of the production resources.
+- **CodeBuild**: builds the source code from GitHub and runs CloudFormation templates.
+- **CloudFormation (CF)**: creates resources using YAML template.
+- **Elastic Container Registry (ECR)**: stores docker images.
+- **Elastic Container Service (ECS)**: groups container instances on which we can run task requests.
+- **Elastic File System (EFS)**: stores user request's data and model's weights.
+- **Application Load Balancer (ALB)**: distributes incoming application traffic across multiple target groups in ECS across Availability Zones. It monitors the health of its registered targets and routes traffic only to the healthy targets.
+- **Route 53**: connects user requests to infrastructure running in AWS, in our case, the ALB. In this project, we use another domain provider to route the traffic at the domain level.
+- **AWS Certificate Manager (ACM)**: provisions, manages, and deploys public and private Secure Sockets Layer/Transport Layer Security (SSL/TLS) certificates for use with AWS services.
+- **Virtual Private Cloud (VPC)**: controls our virtual networking environment, including resource placement, connectivity, and security.
+- **CloudWatch**: collects monitoring and operational data in the form of logs, metrics, and events.
+- **Simple Notification Service (SNS)**: manages messaging service for both application-to-application (A2A) and application-to-person (A2P) communication. In this project, we don't configure SNS.
 
 ## Create Endpoint A
 
-Creating the infrastructure for the endpoint A has several steps:
+Creating the infrastructure for endpoint A has several steps:
 
 1. Create the CloudFormation stack
 1. Create CodePipeline and CodeBuild projects
@@ -83,7 +83,7 @@ The CloudFormation stack creates the ECR repository. The CodePipeline and CodeBu
 This step creates manually CodePipeline and CodeBuild projects. In the next version of this tutorial, this step should be defined in a CloudFormation template.
 
 1. Update `buildspec/ep-a.yaml` file and push the code
-1. Go to AWS Console > CodePipeline > Create new pipeline
+1. Go to AWS Console > CodePipeline > Create a new pipeline
 1. Configure pipeline settings
 
    - Pipeline name: `ep-a`
@@ -119,7 +119,7 @@ This step creates manually CodePipeline and CodeBuild projects. In the next vers
 
 #### 1.3.1. Add GitClone permission to CodeBuild project
 
-Follow the section `Add CodeBuild GitClone permissions for connections to Bitbuket, GitHub, or GitHub Enterprise Server` at [this link](https://docs.aws.amazon.com/codepipeline/latest/userguide/troubleshooting.html#codebuild-role-connections).
+Follow the section `Add CodeBuild GitClone permissions for connections to Bitbucket, GitHub, or GitHub Enterprise Server` at [this link](https://docs.aws.amazon.com/codepipeline/latest/userguide/troubleshooting.html#codebuild-role-connections).
 
 #### 1.3.2. Validate API Health Check path
 
@@ -127,14 +127,14 @@ Make sure the health check path parameter in `cf_templates/create-ep-a.json` is 
 
 #### 1.3.3. Validate ECS's instances permission to access EFS
 
-Manually add the ECS task's security group of the endpoint A to Inbound rules of the security group created for EFS shared volumes. Without this, the ECS's instances cannot access EFS shared volumes. Check [this article](https://forums.aws.amazon.com/thread.jspa?threadID=321135) for more detail.
+Manually add the ECS task's security group of the endpoint A to the Inbound rules of the security group created for EFS shared volumes. Without this, the ECS's instances cannot access EFS shared volumes. Check [this article](https://forums.aws.amazon.com/thread.jspa?threadID=321135) for more detail.
 
-This step can be automated by creating a AWS Lambda function to run the validation task.
+This step can be automated by creating an AWS Lambda function to run the validation task.
 
 ### 1.4. Update CloudFormation stack
 
 1. Set parameter `DesiredCount` in `cf_templates/create-ep-a.json` to the expected value.
-1. Set parameter `APITag` to the latest git commit hash in "master" branch.
+1. Set parameter `APITag` to the latest git commit hash in the "master" branch.
 1. Update stack. This might take ~10m.
 
    ```bash
@@ -169,7 +169,7 @@ This step can be automated by creating a AWS Lambda function to run the validati
 
 ## Add Endpoint B
 
-Adding endpoint B into the existing infrastructure has similar steps as creating the infrastructure for the endpoint A.
+Adding endpoint B into the existing infrastructure has similar steps as creating the infrastructure for endpoint A.
 
 ### 2.1. Create CloudFormation stack
 
@@ -182,23 +182,23 @@ Adding endpoint B into the existing infrastructure has similar steps as creating
 
 ### 2.2. Create CodePipeline and CodeBuild projects
 
-This step is similar as the section `1.2. Create CodePipeline and CodeBuild projects`. For the `buildspec` file, just clone `buildspec/ep-a.yaml` file for the endpoint B.
+This step is similar to section `1.2. Create CodePipeline and CodeBuild projects`. For the `buildspec` file, just clone `buildspec/ep-a.yaml` file for the endpoint B.
 
 ### 2.3. Validate resources
 
-This step is similar as the section `1.3. Validate resources`.
+This step is similar to section `1.3. Validate resources`.
 
 ### 2.4. Update CloudFormation stack
 
-This step is similar as the section `1.4. Update CloudFormation stack`.
+This step is similar to section `1.4. Update CloudFormation stack`.
 
 ### 2.5. Upload model's weights
 
-This step is similar as the section `1.5. Upload model's weights`.
+This step is similar to section `1.5. Upload model's weights`.
 
 ### 2.6. Test endpoint
 
-This step is similar as the section `1.6. Test endpoint`.
+This step is similar to section `1.6. Test endpoint`.
 
 ## Miscellaneous
 
@@ -206,9 +206,9 @@ This step is similar as the section `1.6. Test endpoint`.
 
 In the future, when you want to update and validate the CloudFormation template without triggering the CodePipeline either manually or automatically, follow these steps:
 
-1. Set `APITag` parameter in the parameter json file to the latest git commit hash in master branch.
+1. Set the `APITag` parameter in the parameter JSON file to the latest git commit hash in the master branch.
 1. Run `aws cloudformation update-stack` command.
-1. After confirming the template is usable, discard the changes of the `APITag` parameter in the parameter json file and commit the rest of changes.
+1. After confirming the template is usable, discard the changes of the `APITag` parameter in the parameter JSON file and commit the rest of the changes.
 
 ### Access container in Fargate/EC2 instance using ECS Exec
 
@@ -222,8 +222,8 @@ Sometimes you might want to access the containers in Fargate/EC2 instances for d
    "ssmmessages:OpenControlChannel"
    "ssmmessages:OpenDataChannel"
    ```
-1. Make sure `EnableExecuteCommand` is true in `AWS::ECS::Service` resource in the CloudFormation template.
-   - If you haven't set, then set it to true, and update the cloudformation stack
+1. Make sure `EnableExecuteCommand` is true in the `AWS::ECS::Service` resource in the CloudFormation template.
+   - If you haven't set it, then set it to true, and update the cloudformation stack
    - Manually stop all the tasks run by your ECS Service
    - Wait until the new tasks are deployed
 1. Run this command to `exec` into the container.
@@ -251,6 +251,13 @@ The purpose of mounting the EFS shared volume is to manipulate the saved data. F
    ```bash
    df -aTh
    ```
+
+## Cleanup
+
+1. Remove the record that points to the ALB's DNS name in your domain service.
+1. Delete all related S3 buckets.
+1. Delete CodePipeline and CodeBuild projects
+1. Delete all the CF stacks one by one starting from the top one. Don't delete them all at once.
 
 ## License
 
