@@ -272,4 +272,4 @@ Project Link: [https://github.com/dao-duc-tung/ecs-mlops](https://github.com/dao
 
 <!-- MARKDOWN LINKS & IMAGES -->
 
-[architecture]: /assets/images/architecture.png
+[architecture]: /assets/architecture.png
