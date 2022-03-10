@@ -4,7 +4,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/dao-duc-tung/ecs-mlops">
-    <img src="assets/images/banner.png" alt="Logo" width="300" height="100">
+    <img src="assets/banner.png" alt="Logo" width="300" height="100">
   </a>
 
   <h3 align="center">ECS MLOps</h3>
