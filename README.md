@@ -27,9 +27,9 @@
 
 ## Introduction
 
-This is a sample solution to build a completed MLOps pipeline in production for a typical ML system. This example could be useful for any engineer or organization looking to operationalize ML with native AWS development tools such as CodePipeline, CodeBuild, and ECS.
+This is a solution to build a completed MLOps pipeline in production for a typical ML system. This example could be useful for any engineer or organization looking to operationalize ML with native AWS development tools such as CodePipeline, CodeBuild, and ECS.
 
-The main use-case of this sample solution is:
+The main use cases of this solution are:
 
 1. Your team wants to deploy infrastructure for an ML endpoint of an ML system. Let's call this endpoint `A`.
 1. After that, your team wants to deploy another ML endpoint of the same ML system into the existing infrastructure. Let's call this endpoint `B`.
