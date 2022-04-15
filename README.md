@@ -1,4 +1,4 @@
-# ECS MLOps
+# ECS ML Deployment System
 
 <!-- PROJECT LOGO -->
 <br />
